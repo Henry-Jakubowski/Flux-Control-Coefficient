@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux Control Coefficient Explorer</title>
+<style>
+  :root{
+    --green:#2e7d32;
+    --blue:#1565c0;
+    --ink:#222;
+    --bg:#fafafa;
+    --card:#ffffff;
+    --border:#d8d8d8;
+  }
+  *{box-sizing:border-box;}
+  body{
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    color:var(--ink);
+    background:var(--bg);
+    margin:0;
+    padding:20px;
+  }
+  .fcc-wrap{
+    max-width:760px;
+    margin:0 auto;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:20px 24px 26px;
+  }
+  h2{
+    margin-top:0;
+    font-size:1.3em;
+  }
+  .subtitle{
+    color:#555;
+    font-size:0.95em;
+    margin-top:-8px;
+    margin-bottom:18px;
+  }
+  .layout{
+    display:flex;
+    flex-wrap:wrap;
+    gap:22px;
+  }
+  .plot-col{
+    flex:1 1 380px;
+  }
+  .panel-col{
+    flex:1 1 260px;
+    min-width:240px;
+  }
+  canvas{
+    width:100%;
+    max-width:420px;
+    height:auto;
+    border:1px solid var(--border);
+    border-radius:6px;
+    background:#fff;
+    display:block;
+  }
+  .controls{
+    margin-top:14px;
+  }
+  .slider-row{
+    margin-bottom:14px;
+  }
+  .slider-row label{
+    display:flex;
+    justify-content:space-between;
+    font-size:0.92em;
+    font-weight:600;
+    margin-bottom:4px;
+  }
+  .slider-row label span.val{
+    font-weight:700;
+    color:var(--blue);
+  }
+  input[type=range]{
+    width:100%;
+  }
+  .view-toggle{
+    display:flex;
+    gap:8px;
+    margin-bottom:14px;
+  }
+  .view-toggle button, .presets button, .reset-btn{
+    cursor:pointer;
+    border:1px solid var(--border);
+    background:#f2f2f2;
+    border-radius:6px;
+    padding:6px 10px;
+    font-size:0.85em;
+  }
+  .view-toggle button.active{
+    background:var(--blue);
+    color:#fff;
+    border-color:var(--blue);
+  }
+  .stat-card{
+    background:#f5f7fa;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:12px 14px;
+    font-size:0.92em;
+    line-height:1.55;
+  }
+  .stat-card .row{
+    display:flex;
+    justify-content:space-between;
+  }
+  .stat-card .row b{
+    font-variant-numeric: tabular-nums;
+  }
+  .sumbar{
+    margin-top:12px;
+    height:22px;
+    width:100%;
+    border-radius:5px;
+    overflow:hidden;
+    display:flex;
+    border:1px solid var(--border);
+  }
+  .sumbar .c1{ background:var(--green); }
+  .sumbar .c2{ background:var(--blue); }
+  .sumbar-label{
+    display:flex;
+    justify-content:space-between;
+    font-size:0.8em;
+    margin-top:4px;
+    color:#444;
+  }
+  .legend{
+    font-size:0.8em;
+    color:#555;
+    margin-top:10px;
+  }
+  .legend .sw{
+    display:inline-block;
+    width:10px;height:10px;
+    border-radius:2px;
+    margin-right:5px;
+  }
+  .questions{
+    margin-top:26px;
+    border-top:1px solid var(--border);
+    padding-top:16px;
+  }
+  .questions h3{
+    margin-bottom:10px;
+    font-size:1.05em;
+  }
+  .q-item{
+    background:#f9fafb;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:10px 14px;
+    margin-bottom:10px;
+  }
+  .q-item p{
+    margin:0 0 8px 0;
+    font-size:0.93em;
+  }
+  .q-item button{
+    cursor:pointer;
+    border:1px solid var(--green);
+    background:#eaf5ea;
+    color:var(--green);
+    border-radius:6px;
+    padding:5px 10px;
+    font-size:0.82em;
+  }
+  .formula{
+    font-style:italic;
+    color:#444;
+    font-size:0.88em;
+  }
+  .reset-btn{
+    margin-top:6px;
+  }
+</style>
+</head>
+<body>
+<div class="fcc-wrap">
+  <h2>Flux Control Coefficient Explorer</h2>
+  <p class="subtitle">A minimal two-enzyme pathway (E1 &rarr; S &rarr; E2) at steady state, where flux
+    <span class="formula">J = (u<sub>1</sub>&middot;u<sub>2</sub>)/(u<sub>1</sub>+u<sub>2</sub>)</span>.
+    Drag the sliders to change enzyme activities u<sub>1</sub> and u<sub>2</sub> and watch how control over the flux shifts between the two enzymes.</p>
+
+  <div class="layout">
+    <div class="plot-col">
+      <div class="view-toggle">
+        <button id="btnLinear" class="active">Linear plot (J vs u&#8321;)</button>
+        <button id="btnLog">ln&#8211;ln plot</button>
+      </div>
+      <canvas id="plot" width="420" height="340"></canvas>
+      <div class="legend">
+        <span class="sw" style="background:#c62828;"></span>current point on E1's curve &nbsp;&nbsp;
+        <span class="sw" style="background:#333;"></span>tangent line (slope = dJ/du&#8321;, or the FCC on the ln&#8211;ln plot)
+      </div>
+    </div>
+
+    <div class="panel-col">
+      <div class="controls">
+        <div class="slider-row">
+          <label>u&#8321; (E1 activity) <span class="val" id="u1val">1.0</span></label>
+          <input type="range" id="u1" min="0.1" max="10" step="0.1" value="1">
+        </div>
+        <div class="slider-row">
+          <label>u&#8322; (E2 activity) <span class="val" id="u2val">1.0</span></label>
+          <input type="range" id="u2" min="0.1" max="10" step="0.1" value="1">
+        </div>
+        <button class="reset-btn" id="resetBtn">Reset to u&#8321;=u&#8322;=1</button>
+      </div>
+
+      <div class="stat-card">
+        <div class="row"><span>Flux, J</span><b id="Jval"></b></div>
+        <div class="row"><span>dJ/du&#8321; (slope)</span><b id="dJdu1"></b></div>
+        <div class="row"><span>C<sub>E1</sub><sup>J</sup> (FCC of E1)</span><b id="C1val"></b></div>
+        <div class="row"><span>C<sub>E2</sub><sup>J</sup> (FCC of E2)</span><b id="C2val"></b></div>
+        <div class="row"><span>C1 + C2</span><b id="sumval"></b></div>
+      </div>
+
+      <div class="sumbar">
+        <div class="c1" id="barC1" style="width:50%"></div>
+        <div class="c2" id="barC2" style="width:50%"></div>
+      </div>
+      <div class="sumbar-label">
+        <span style="color:var(--green);">&#9632; C(E1)</span>
+        <span style="color:var(--blue);">C(E2) &#9632;</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="questions">
+    <h3>Try it yourself</h3>
+
+    <div class="q-item">
+      <p><b>1. The "limiting" enzyme.</b> Set E1 low and E2 high (try u&#8321;=0.2, u&#8322;=8). What happens to
+      C<sub>E1</sub><sup>J</sup>? Which enzyme is effectively "in control" of the flux here, and why does that match the idea of a rate-limiting step?</p>
+      <button data-u1="0.2" data-u2="8">Set u&#8321;=0.2, u&#8322;=8</button>
+    </div>
+
+    <div class="q-item">
+      <p><b>2. Shared control.</b> Set u&#8321;=u&#8322;=1. What are C<sub>E1</sub><sup>J</sup> and C<sub>E2</sub><sup>J</sup> now? Explain in words what it means for control to be "distributed equally" between two enzymes.</p>
+      <button data-u1="1" data-u2="1">Set u&#8321;=u&#8322;=1</button>
+    </div>
+
+    <div class="q-item">
+      <p><b>3. Diminishing returns.</b> Starting from u&#8321;=u&#8322;=1, slide u&#8321; up toward 10 while leaving u&#8322; fixed. Watch the linear plot: why does the curve flatten out, and what does a flattening slope tell you about C<sub>E1</sub><sup>J</sup> as an enzyme becomes more abundant relative to its partner?</p>
+      <button data-u1="10" data-u2="1">Set u&#8321;=10, u&#8322;=1</button>
+    </div>
+
+    <div class="q-item">
+      <p><b>4. The Summation Theorem.</b> Move both sliders to several different combinations and watch the C1+C2 value and the stacked bar. Does the sum ever change? Using the equation J = u&#8321;u&#8322;/(u&#8321;+u&#8322;), can you see algebraically why C<sub>E1</sub><sup>J</sup> + C<sub>E2</sub><sup>J</sup> must equal 1?</p>
+      <button data-u1="3" data-u2="0.4">Try u&#8321;=3, u&#8322;=0.4</button>
+    </div>
+
+    <div class="q-item">
+      <p><b>5. Reading the ln&#8211;ln plot.</b> Switch to the ln&#8211;ln view. The text states that C<sub>Ei</sub><sup>J</sup> equals the slope of ln J vs ln u<sub>i</sub>. Confirm this: does the tangent slope shown on the log&#8211;log plot match the C<sub>E1</sub><sup>J</sup> value in the stat panel?</p>
+      <button data-u1="1.5" data-u2="4">Set u&#8321;=1.5, u&#8322;=4 &amp; switch view</button>
+    </div>
+
+    <div class="q-item">
+      <p><b>6. Connecting to GAPDH.</b> The Shestov et al. data showed that hexokinase and PFK, both thermodynamically "favored," had near-zero or negative flux control coefficients, while GAPDH's was strongly positive. Using this two-enzyme model as an analogy, what would u<sub>1</sub> vs u<sub>2</sub> need to look like for E1 to behave like GAPDH &mdash; the step that truly controls the flux &mdash; even though it isn't the most thermodynamically favorable step?</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const u1Slider = document.getElementById('u1');
+  const u2Slider = document.getElementById('u2');
+  const u1val = document.getElementById('u1val');
+  const u2val = document.getElementById('u2val');
+  const Jval = document.getElementById('Jval');
+  const dJdu1El = document.getElementById('dJdu1');
+  const C1val = document.getElementById('C1val');
+  const C2val = document.getElementById('C2val');
+  const sumval = document.getElementById('sumval');
+  const barC1 = document.getElementById('barC1');
+  const barC2 = document.getElementById('barC2');
+  const canvas = document.getElementById('plot');
+  const ctx = canvas.getContext('2d');
+  const btnLinear = document.getElementById('btnLinear');
+  const btnLog = document.getElementById('btnLog');
+  const resetBtn = document.getElementById('resetBtn');
+
+  let mode = 'linear'; // or 'log'
+
+  function J(u1,u2){ return (u1*u2)/(u1+u2); }
+
+  // analytic dJ/du1 = u2^2/(u1+u2)^2
+  function dJdu1(u1,u2){ return (u2*u2)/Math.pow(u1+u2,2); }
+
+  function fmt(x, d){ return Number(x).toFixed(d===undefined?3:d); }
+
+  function draw(){
+    const u1 = parseFloat(u1Slider.value);
+    const u2 = parseFloat(u2Slider.value);
+    u1val.textContent = fmt(u1,1);
+    u2val.textContent = fmt(u2,1);
+
+    const j = J(u1,u2);
+    const slope = dJdu1(u1,u2);
+    const C1 = slope * (u1/j);
+    const C2 = 1 - C1; // equivalently u1/(u1+u2)
+
+    Jval.textContent = fmt(j,3);
+    dJdu1El.textContent = fmt(slope,3);
+    C1val.textContent = fmt(C1,3);
+    C2val.textContent = fmt(C2,3);
+    sumval.textContent = fmt(C1+C2,3);
+
+    const pc1 = Math.max(0,Math.min(100, C1*100));
+    barC1.style.width = pc1 + '%';
+    barC2.style.width = (100-pc1) + '%';
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const pad = {l:50,r:20,t:20,b:40};
+    const w = canvas.width - pad.l - pad.r;
+    const h = canvas.height - pad.t - pad.b;
+
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, pad.t);
+    ctx.lineTo(pad.l, pad.t+h);
+    ctx.lineTo(pad.l+w, pad.t+h);
+    ctx.stroke();
+
+    ctx.fillStyle = '#333';
+    ctx.font = '11px sans-serif';
+
+    if(mode === 'linear'){
+      const uMax = 10.2;
+      const yMax = u2 * 1.15 + 0.3; // asymptote is u2
+      function X(u){ return pad.l + (u/uMax)*w; }
+      function Y(jj){ return pad.t + h - (jj/yMax)*h; }
+
+      // axis labels
+      ctx.fillText('u₁', pad.l+w-14, pad.t+h+22);
+      ctx.save();
+      ctx.translate(14, pad.t+h/2);
+      ctx.rotate(-Math.PI/2);
+      ctx.fillText('J', 0, 0);
+      ctx.restore();
+
+      // curve
+      ctx.strokeStyle = '#1565c0';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for(let i=0;i<=200;i++){
+        const uu = 0.05 + (uMax-0.05)*(i/200);
+        const jj = J(uu,u2);
+        const x = X(uu), y = Y(jj);
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+
+      // asymptote (dashed) at J = u2
+      ctx.setLineDash([4,4]);
+      ctx.strokeStyle = '#aaa';
+      ctx.beginPath();
+      ctx.moveTo(pad.l, Y(u2));
+      ctx.lineTo(pad.l+w, Y(u2));
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // tangent line at current u1
+      const x0 = X(u1), y0 = Y(j);
+      const dx = 1.6; // in u units, half-length
+      const u1a = Math.max(0.05, u1-dx), u1b = Math.min(uMax, u1+dx);
+      const ja = j + slope*(u1a-u1), jb = j + slope*(u1b-u1);
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(X(u1a), Y(ja));
+      ctx.lineTo(X(u1b), Y(jb));
+      ctx.stroke();
+
+      // point
+      ctx.fillStyle = '#c62828';
+      ctx.beginPath();
+      ctx.arc(x0,y0,4,0,2*Math.PI);
+      ctx.fill();
+
+      // tick labels
+      ctx.fillStyle = '#555';
+      ctx.fillText('0', pad.l-4, pad.t+h+14);
+      ctx.fillText(fmt(uMax,0), pad.l+w-8, pad.t+h+14);
+      ctx.fillText(fmt(yMax,1), pad.l-32, pad.t+8);
+
+    } else {
+      // log-log view
+      const lnU1 = Math.log(u1);
+      const lnJ = Math.log(j);
+      const uMin = 0.05, uMax = 10.2;
+      const lnUmin = Math.log(uMin), lnUmax = Math.log(uMax);
+      const jAtMin = J(uMin,u2), jAtMax = J(uMax,u2);
+      const lnJmin = Math.log(jAtMin), lnJmax = Math.log(jAtMax);
+      const pad2 = 0.3;
+      function X(lu){ return pad.l + ((lu-lnUmin)/(lnUmax-lnUmin))*w; }
+      function Y(lj){ return pad.t + h - ((lj-(lnJmin-pad2))/((lnJmax+pad2)-(lnJmin-pad2)))*h; }
+
+      ctx.fillText('ln(u₁)', pad.l+w-30, pad.t+h+22);
+      ctx.save();
+      ctx.translate(14, pad.t+h/2);
+      ctx.rotate(-Math.PI/2);
+      ctx.fillText('ln(J)', 0, 0);
+      ctx.restore();
+
+      ctx.strokeStyle = '#1565c0';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for(let i=0;i<=200;i++){
+        const lu = lnUmin + (lnUmax-lnUmin)*(i/200);
+        const uu = Math.exp(lu);
+        const lj = Math.log(J(uu,u2));
+        const x = X(lu), y = Y(lj);
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+
+      // tangent in log-log space: slope = C1
+      const x0 = X(lnU1), y0 = Y(lnJ);
+      const dlu = 1.0;
+      const lu_a = lnU1-dlu, lu_b = lnU1+dlu;
+      const lj_a = lnJ + C1*(lu_a-lnU1), lj_b = lnJ + C1*(lu_b-lnU1);
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(X(lu_a), Y(lj_a));
+      ctx.lineTo(X(lu_b), Y(lj_b));
+      ctx.stroke();
+
+      ctx.fillStyle = '#c62828';
+      ctx.beginPath();
+      ctx.arc(x0,y0,4,0,2*Math.PI);
+      ctx.fill();
+    }
+  }
+
+  u1Slider.addEventListener('input', draw);
+  u2Slider.addEventListener('input', draw);
+
+  btnLinear.addEventListener('click', ()=>{
+    mode='linear'; btnLinear.classList.add('active'); btnLog.classList.remove('active'); draw();
+  });
+  btnLog.addEventListener('click', ()=>{
+    mode='log'; btnLog.classList.add('active'); btnLinear.classList.remove('active'); draw();
+  });
+
+  resetBtn.addEventListener('click', ()=>{
+    u1Slider.value = 1; u2Slider.value = 1; draw();
+  });
+
+  document.querySelectorAll('.q-item button[data-u1]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      u1Slider.value = btn.getAttribute('data-u1');
+      u2Slider.value = btn.getAttribute('data-u2');
+      draw();
+      canvas.scrollIntoView({behavior:'smooth', block:'center'});
+    });
+  });
+
+  draw();
+})();
+</script>
+</body>
+</html>
